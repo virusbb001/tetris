@@ -50,8 +50,6 @@ typedef struct{
  Tetris_Data *data;
 }TetrisWorld;
 
-void signalhandler(int sig);
-
 //初期化系
 void initialize(TetrisWorld *thisData);
 void setHardStatus(Tetris_Hard_Info *thisHard);
@@ -60,13 +58,18 @@ void setTetrisData(TetrisWorld *thisData);
 void initData(TetrisWorld *thisData);
 
 void loop(TetrisWorld *thisData);
+void draw(TetrisWorld *thisData);
 void set_block(int block_no,int block[4][4]);
 void generate_block(TetrisWorld *thisData);
 void move_block(TetrisWorld *thisData);
-void drawNextBlock(TetrisWorld *thisData);
-void draw(TetrisWorld *thisData);
 int conflict(TetrisWorld *thisData);
 int gameover(TetrisWorld *thisData);
+void signalhandler(int sig);
+void set_map_block(TetrisWorld *thisData);
+void deleteLine(TetrisWorld *thisData);
+void rotateblock(TetrisWorld *thisData,int mode);
+void drawNextBlock(TetrisWorld *thisData);
+
 
 
 //だいたい移植完了
@@ -398,6 +401,79 @@ void drawNextBlock(TetrisWorld *thisData){
   }
  }
  wattroff(thisData->display->LED,COLOR_PAIR(1));
+}
+
+//移植多分完了
+void deleteLine(TetrisWorld *thisData){
+#define MAP_Y thisData->tetris->map_y
+#define MAP_X thisData->tetris->map_x
+#define MAP thisData->data->map
+ int i,j,k;
+ int flag;
+ //int dLine;
+
+ for(i=0;i<(int)MAP_Y;i++){
+  flag=MAP[MAP_Y-1-i][0];
+  for(j=1;j<(int)MAP_X;j++){
+   flag&=MAP[MAP_Y-1-i][j];
+  }
+  if(flag){
+   for(k=i;k<(int)MAP_Y-1;k++){
+    for(j=0;j<(int)MAP_X;j++){
+     MAP[MAP_Y-1-k][j]=MAP[MAP_Y-1-k-1][j];
+    }
+   }
+   for(j=0;j<(int)MAP_X-1;j++){
+    MAP[0][j]=0;
+   }
+   i--;
+  }
+ }
+#undef MAP_Y
+#undef MAP_X
+#undef MAP
+}
+
+//移植完了
+void rotateblock(TetrisWorld *thisData,int mode){
+#define BLOCK thisData->data->using_block
+ int i,j;
+ int tmp[4][4];
+
+ for(i=0;i<4;i++){
+  for(j=0;j<4;j++){
+   if(mode<0){
+    tmp[i][j]=BLOCK[j][3-i];
+   }else if(mode>0){
+    tmp[i][j]=BLOCK[3-j][i];
+   }
+  }
+ }
+
+ for(i=0;i<4;i++){
+  for(j=0;j<4;j++){
+   BLOCK[i][j]=tmp[i][j];
+  }
+ }
+#undef BLOCK
+}
+
+//ブロック固定
+void set_map_block(TetrisWorld *thisData){
+#define BLOCK_X thisData->data->block_x
+#define BLOCK_Y thisData->data->block_y
+#define BLOCK thisData->data->using_block
+#define MAP thisData->data->map
+ int i,j;
+ for(i=0;i<4;i++){
+  for(j=0;j<4;j++){
+   MAP[BLOCK_Y+i][BLOCK_X+j]|=BLOCK[i][j];
+  }
+ }
+#undef BLOCK_X
+#undef BLOCK_Y
+#undef BLOCK
+#undef MAP
 }
 
 int gameover(TetrisWorld *thisData){

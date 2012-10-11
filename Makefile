@@ -4,3 +4,6 @@ all:tetris
 
 tetris:main.c
 	$(CC) -o tetris main.c -W -Wall -lncurses -g
+
+clean:
+	rm tetris
