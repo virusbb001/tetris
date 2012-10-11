@@ -223,6 +223,7 @@ void loop(TetrisWorld *thisData){
  draw(thisData);
 }
 
+//移植だいたい終わった
 void move_block(TetrisWorld *thisData){
  //入力
  int ch;
@@ -231,7 +232,7 @@ void move_block(TetrisWorld *thisData){
  int move_y;
  int down=0;
  int rotateFlag=0;
- ch=wgetch(realWindow);
+ ch=wgetch(thisData->display->LED);
  switch(ch){
   case KEY_LEFT:
   case 'h':
@@ -255,7 +256,7 @@ void move_block(TetrisWorld *thisData){
 
  if(rotateFlag!=0){
   rotateblock(thisData,rotateFlag);
-  tmp=conflict(-rotateFlag);
+  tmp=conflict(thisData);
   if(tmp){
    rotateblock(thisData,-rotateFlag);
   }
@@ -268,17 +269,17 @@ void move_block(TetrisWorld *thisData){
   move_y=0;
  }
 
- block_x+=move_x;
+ thisData->data->block_x+=move_x;
  tmp=conflict(thisData);
  if(tmp){
-  block_x-=move_x;
+  thisData->data->block_x-=move_x;
   move_x=0;
  }
  if(move_y){
-  block_y+=move_y;
+  thisData->data->block_y+=move_y;
   tmp=conflict(thisData);
   if(tmp){
-   block_y-=1;
+   thisData->data->block_y-=1;
    if(!move_x){
     set_map_block(thisData);
     deleteLine(thisData);
