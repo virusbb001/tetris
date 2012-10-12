@@ -1,12 +1,21 @@
-#include <stdio.h>
+#define HAS_CURSES
+#define AVR
+
+#if define(HAS_CURSES)&&define(AVR)
+# error AVRとHAS_CURSESが両方共defineされています
+#endif
+
 #include <stdlib.h>
 #include <time.h>
 #include <unistd.h>
 
+
 //PC用
+#if define HAS_CURSES
+#include <stdio.h>
 #include <signal.h>
 #include <ncurses.h>
-
+#endif
 
 typedef struct{
  unsigned int LED_height;
@@ -15,11 +24,13 @@ typedef struct{
  unsigned int LCD_width;
 }Tetris_Hard_Info;
 
+#if define HAS_CURSES
 typedef struct{
  WINDOW *LCD;
  WINDOW *realLCD;
  WINDOW *LED;
 }Tetris_Ncurses_Display;
+#endif
 
 typedef struct{
  unsigned int block_down_time;
@@ -40,12 +51,13 @@ typedef struct{
  int endFlag;
  int flame;
  int map[16][10];
-
 }Tetris_Data;
 
 typedef struct{
  Tetris_Hard_Info *hard;
+#if define HAS_CURSES
  Tetris_Ncurses_Display *display;
+#endif
  Tetris_Data_List *tetris;
  Tetris_Data *data;
 }TetrisWorld;
@@ -53,9 +65,11 @@ typedef struct{
 //初期化系
 void initialize(TetrisWorld *thisData);
 void setHardStatus(Tetris_Hard_Info *thisHard);
-void setNcurses(TetrisWorld *thisData);
 void setTetrisData(TetrisWorld *thisData);
 void initData(TetrisWorld *thisData);
+#if define HAS_CURSES
+void setNcurses(TetrisWorld *thisData);
+#endif
 
 void loop(TetrisWorld *thisData);
 void draw(TetrisWorld *thisData);
@@ -70,15 +84,14 @@ void deleteLine(TetrisWorld *thisData);
 void rotateblock(TetrisWorld *thisData,int mode);
 void drawNextBlock(TetrisWorld *thisData);
 
-
-
-//だいたい移植完了
 int main(void){
  TetrisWorld *this=(TetrisWorld *)malloc(sizeof(TetrisWorld));
  this->hard=(Tetris_Hard_Info *)malloc(sizeof(Tetris_Hard_Info));
- this->display=(Tetris_Ncurses_Display *)malloc(sizeof(Tetris_Ncurses_Display));
  this->tetris=(Tetris_Data_List *)malloc(sizeof(Tetris_Data_List));
  this->data=(Tetris_Data *)malloc(sizeof(Tetris_Data));
+#if define HAS_CURSES
+ this->display=(Tetris_Ncurses_Display *)malloc(sizeof(Tetris_Ncurses_Display));
+#endif
  initialize(this);
  while(!this->data->endFlag){
   this->data->flame++;
@@ -104,6 +117,7 @@ void setHardStatus(Tetris_Hard_Info *thisHard){
  thisHard->LCD_width=16;
 }
 
+#if define HAS_CURSES
 void setNcurses(TetrisWorld *thisData){
  WINDOW *LCD,*rLCD,*LED;
  int i;
@@ -151,6 +165,7 @@ void setNcurses(TetrisWorld *thisData){
  thisData->display->realLCD=rLCD;
  thisData->display->LCD=LCD;
 }
+#endif
 
 void setTetrisData(TetrisWorld *thisData){
  thisData->tetris->block_down_time=60;
@@ -216,7 +231,6 @@ void set_block(int block_no,int block[4][4]){
  }
 }
 
-//移植完了
 void loop(TetrisWorld *thisData){
  if(thisData->data->generateFlag){
   generate_block(thisData);
@@ -226,7 +240,6 @@ void loop(TetrisWorld *thisData){
  draw(thisData);
 }
 
-//移植だいたい終わった
 void move_block(TetrisWorld *thisData){
  //入力
  int ch;
@@ -235,6 +248,7 @@ void move_block(TetrisWorld *thisData){
  int move_y;
  int down=0;
  int rotateFlag=0;
+#if define HAS_CURSES
  ch=wgetch(thisData->display->LED);
  switch(ch){
   case KEY_LEFT:
@@ -256,6 +270,14 @@ void move_block(TetrisWorld *thisData){
   default:
    break;
  }
+#endif
+
+#if define AVR
+
+#endif
+
+#if define AVR
+#endif
 
  if(rotateFlag!=0){
   rotateblock(thisData,rotateFlag);
@@ -298,7 +320,6 @@ void signalhandler(int sig){
  exit(EXIT_FAILURE);
 }
 
-//移植完了
 void generate_block(TetrisWorld *thisData){
  thisData->data->flame=0;
  thisData->data->generateFlag=0;
@@ -313,7 +334,6 @@ void generate_block(TetrisWorld *thisData){
  drawNextBlock(thisData);
 }
 
-//移植完了
 int conflict(TetrisWorld *thisData){
  int i,j;
  int tmp;
@@ -337,7 +357,6 @@ int conflict(TetrisWorld *thisData){
  return res;
 }
 
-//移植完了
 void draw(TetrisWorld *thisData){
  int i,j;
  WINDOW *LED;
@@ -384,7 +403,6 @@ void draw(TetrisWorld *thisData){
  wrefresh(LED);
 }
 
-//移植完了
 void drawNextBlock(TetrisWorld *thisData){
  int dummy[4][4];
  int i,j;
@@ -403,7 +421,6 @@ void drawNextBlock(TetrisWorld *thisData){
  wattroff(thisData->display->LED,COLOR_PAIR(1));
 }
 
-//移植多分完了
 void deleteLine(TetrisWorld *thisData){
 #define MAP_Y thisData->tetris->map_y
 #define MAP_X thisData->tetris->map_x
@@ -434,7 +451,6 @@ void deleteLine(TetrisWorld *thisData){
 #undef MAP
 }
 
-//移植完了
 void rotateblock(TetrisWorld *thisData,int mode){
 #define BLOCK thisData->data->using_block
  int i,j;
