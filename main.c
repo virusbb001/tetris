@@ -1,127 +1,118 @@
-#define HAS_CURSES
-#define AVR
+#include "main.h"
 
-#if define(HAS_CURSES)&&define(AVR)
-# error AVRとHAS_CURSESが両方共defineされています
+#if defined(HAS_CURSES)
+WINDOW *LCD;
+WINDOW *realLCD;
+WINDOW *LED;
 #endif
 
-#include <stdlib.h>
-#include <time.h>
-#include <unistd.h>
-
-
-//PC用
-#if define HAS_CURSES
-#include <stdio.h>
-#include <signal.h>
-#include <ncurses.h>
-#endif
-
-typedef struct{
- unsigned int LED_height;
- unsigned int LED_width;
- unsigned int LCD_height;
- unsigned int LCD_width;
-}Tetris_Hard_Info;
-
-#if define HAS_CURSES
-typedef struct{
- WINDOW *LCD;
- WINDOW *realLCD;
- WINDOW *LED;
-}Tetris_Ncurses_Display;
-#endif
-
-typedef struct{
- unsigned int block_down_time;
- unsigned int map_x;
- unsigned int map_y;
-}Tetris_Data_List;
-
-typedef struct{
- int block_x;
- int block_y;
- int next_block_no;
- int using_block[4][4];
-
- unsigned int deletedLine;
- unsigned int score;
-
- int generateFlag;
- int endFlag;
- int flame;
- int map[16][10];
-}Tetris_Data;
-
-typedef struct{
- Tetris_Hard_Info *hard;
-#if define HAS_CURSES
- Tetris_Ncurses_Display *display;
-#endif
- Tetris_Data_List *tetris;
- Tetris_Data *data;
-}TetrisWorld;
+int call_tetris(void);
 
 //初期化系
-void initialize(TetrisWorld *thisData);
-void setHardStatus(Tetris_Hard_Info *thisHard);
-void setTetrisData(TetrisWorld *thisData);
-void initData(TetrisWorld *thisData);
-#if define HAS_CURSES
-void setNcurses(TetrisWorld *thisData);
+static void initialize(TetrisWorld *thisData);
+static void setHardStatus(Tetris_Hard_Info *thisHard);
+static void setTetrisData(TetrisWorld *thisData);
+static void initData(TetrisWorld *thisData);
+#if defined(HAS_CURSES)
+static void setNcurses(TetrisWorld *thisData);
+static void signalhandler(int sig);
+#elif defined(ENABLE_AVR)
+static void initAVR(void);
 #endif
 
-void loop(TetrisWorld *thisData);
-void draw(TetrisWorld *thisData);
-void set_block(int block_no,int block[4][4]);
-void generate_block(TetrisWorld *thisData);
-void move_block(TetrisWorld *thisData);
-int conflict(TetrisWorld *thisData);
-int gameover(TetrisWorld *thisData);
-void signalhandler(int sig);
-void set_map_block(TetrisWorld *thisData);
-void deleteLine(TetrisWorld *thisData);
-void rotateblock(TetrisWorld *thisData,int mode);
-void drawNextBlock(TetrisWorld *thisData);
+//TCNT0
+
+static void loop(TetrisWorld *thisData);
+static void draw(TetrisWorld *thisData);
+static void set_block(int block_no,int block[4][4]);
+static void generate_block(TetrisWorld *thisData);
+static void move_block(TetrisWorld *thisData);
+static int conflict(TetrisWorld *thisData);
+static int gameover(TetrisWorld *thisData);
+static void set_map_block(TetrisWorld *thisData);
+static void deleteLine(TetrisWorld *thisData);
+static void rotateblock(TetrisWorld *thisData,int mode);
+static void drawNextBlock(TetrisWorld *thisData);
+static void getTetrisInput(TetrisInput *thisInput);
+
+static void free_this(TetrisWorld *thisData);
+
+//ハード依存系
+void my_led_plot(uint8_t color,uint8_t y,uint8_t x);
+void my_lcd_write(uint8_t row,const char* str);
 
 int main(void){
+ call_tetris();
+ return 0;
+}
+
+static void free_this(TetrisWorld *thisData){
+ free(thisData->hard);
+ free(thisData->tetris);
+ free(thisData->data);
+ free(thisData);
+
+}
+
+int call_tetris(void){
  TetrisWorld *this=(TetrisWorld *)malloc(sizeof(TetrisWorld));
  this->hard=(Tetris_Hard_Info *)malloc(sizeof(Tetris_Hard_Info));
  this->tetris=(Tetris_Data_List *)malloc(sizeof(Tetris_Data_List));
  this->data=(Tetris_Data *)malloc(sizeof(Tetris_Data));
-#if define HAS_CURSES
- this->display=(Tetris_Ncurses_Display *)malloc(sizeof(Tetris_Ncurses_Display));
-#endif
  initialize(this);
  while(!this->data->endFlag){
   this->data->flame++;
   loop(this);
+#if defined(HAS_CURSES)
+  wrefresh(LED);
+  wrefresh(realLCD);
   usleep((1000/60)*1000);
+#elif defined(ENABLE_AVR)
+  _delay_ms(1000/60);
+#endif
  }
+#if defined(HAS_CURSES)
+ free_this(this);
  endwin();
+#endif
 
  return 0;
 }
 
 void initialize(TetrisWorld *thisData){
+ int i;
+
  setHardStatus(thisData->hard);
+#if defined HAS_CURSES
+ srand((unsigned)time(NULL));
  setNcurses(thisData);
+#elif defined ENABLE_AVR
+ srand(TCNT0);
+ initAVR();
+#endif
  setTetrisData(thisData);
  initData(thisData);
+ //描画
+ for(i=0;i<(int)thisData->hard->LED_height;i++){
+  my_led_plot(LED_YELLOW,i,10);
+ }
+ deleteLine(thisData);
 }
 
-void setHardStatus(Tetris_Hard_Info *thisHard){
+static void setHardStatus(Tetris_Hard_Info *thisHard){
  thisHard->LED_height=16;
  thisHard->LED_width=16;
  thisHard->LCD_height=2;
  thisHard->LCD_width=16;
 }
 
-#if define HAS_CURSES
+#if defined(ENABLE_AVR)
+void initAVR(void){
+ led_start();
+}
+#endif
+#if defined HAS_CURSES
 void setNcurses(TetrisWorld *thisData){
- WINDOW *LCD,*rLCD,*LED;
- int i;
-
  if(signal(SIGINT,signalhandler)==SIG_ERR){
   fprintf(stderr,"SIGNALHANDLER ERROR\n");
   exit(EXIT_FAILURE);
@@ -134,14 +125,14 @@ void setNcurses(TetrisWorld *thisData){
  keypad(stdscr,TRUE);
  start_color();
  use_default_colors();
- init_pair(1,COLOR_RED,-1);
- init_pair(2,COLOR_GREEN,-1);
- init_pair(3,COLOR_YELLOW,-1);
+ init_pair(1,-1,COLOR_GREEN);
+ init_pair(2,-1,COLOR_RED);
+ init_pair(3,-1,COLOR_YELLOW);
 
  LED=newwin(thisData->hard->LED_height,thisData->hard->LED_width,5,2);
  LCD=newwin(thisData->hard->LCD_height+2,thisData->hard->LCD_width+2,0,0);
- rLCD=subwin(LCD,thisData->hard->LCD_height,thisData->hard->LCD_width,1,1);
- if(LED==NULL||LCD==NULL||rLCD==NULL){
+ realLCD=subwin(LCD,thisData->hard->LCD_height,thisData->hard->LCD_width,1,1);
+ if(LED==NULL||LCD==NULL||realLCD==NULL){
   endwin();
   fprintf(stderr,"LCD IS NULL\n");
   exit(EXIT_FAILURE);
@@ -154,16 +145,6 @@ void setNcurses(TetrisWorld *thisData){
  box(LCD,'|','-');
  wrefresh(LCD);
 
- wattron(LED,COLOR_PAIR(3));
- for(i=0;i<(int)thisData->hard->LED_height;i++){
-  mvwaddch(LED,i,10,'X');
- }
- wattroff(LED,COLOR_PAIR(3));
- wrefresh(LED);
-
- thisData->display->LED=LED;
- thisData->display->realLCD=rLCD;
- thisData->display->LCD=LCD;
 }
 #endif
 
@@ -242,52 +223,24 @@ void loop(TetrisWorld *thisData){
 
 void move_block(TetrisWorld *thisData){
  //入力
- int ch;
+ TetrisInput my_switch={0};
  int tmp;
- int move_x=0;
  int move_y;
- int down=0;
- int rotateFlag=0;
-#if define HAS_CURSES
- ch=wgetch(thisData->display->LED);
- switch(ch){
-  case KEY_LEFT:
-  case 'h':
-   move_x=-1;
-   break;
-  case KEY_RIGHT:
-  case 'l':
-   move_x=1;
-   break;
-  case KEY_DOWN:
-  case 'j':
-   down=1;
-   break;
-  case KEY_UP:
-  case 'k':
-  case ' ':
-   rotateFlag=1;
-  default:
-   break;
- }
-#endif
+ int move_x=0;
 
-#if define AVR
+ getTetrisInput(&my_switch);
+ move_x=my_switch.x;
 
-#endif
 
-#if define AVR
-#endif
-
- if(rotateFlag!=0){
-  rotateblock(thisData,rotateFlag);
+ if(my_switch.rotate!=0){
+  rotateblock(thisData,my_switch.rotate);
   tmp=conflict(thisData);
   if(tmp){
-   rotateblock(thisData,-rotateFlag);
+   rotateblock(thisData,-my_switch.rotate);
   }
  }
 
- if(down||thisData->data->flame%thisData->tetris->block_down_time==0){
+ if(my_switch.down||thisData->data->flame%thisData->tetris->block_down_time==0){
   move_y=1;
   thisData->data->flame=0;
  }else{
@@ -314,11 +267,14 @@ void move_block(TetrisWorld *thisData){
  }
 }
 
+#if defined HAS_CURSES
 void signalhandler(int sig){
  endwin();
  fprintf(stderr,"SIG:%d\n",sig);
+ sig=sig;
  exit(EXIT_FAILURE);
 }
+#endif
 
 void generate_block(TetrisWorld *thisData){
  thisData->data->flame=0;
@@ -326,12 +282,13 @@ void generate_block(TetrisWorld *thisData){
  thisData->data->block_x=3;
  thisData->data->block_y=0;
  set_block(thisData->data->next_block_no,thisData->data->using_block);
- if(conflict(thisData)){
-  gameover(thisData);
- }
 
  thisData->data->next_block_no=rand()%7;
  drawNextBlock(thisData);
+
+ if(conflict(thisData)){
+  gameover(thisData);
+ }
 }
 
 int conflict(TetrisWorld *thisData){
@@ -359,30 +316,25 @@ int conflict(TetrisWorld *thisData){
 
 void draw(TetrisWorld *thisData){
  int i,j;
- WINDOW *LED;
-
- LED=thisData->display->LED;
 
  for(i=0;i<(int)thisData->tetris->map_y;i++){
-  wmove(LED,i,0);
   for(j=0;j<(int)thisData->tetris->map_x;j++){
    switch(thisData->data->map[i][j]){
     case 0:
-     waddch(LED,' ');
+     my_led_plot(LED_NONE,i,j);
      break;
     case 1:
-     wattron(LED,COLOR_PAIR(1));
-     waddch(LED,'X');
-     wattroff(LED,COLOR_PAIR(1));
+     my_led_plot(LED_RED,i,j);
      break;
     default:
+#if defined HAS_CURSES
      waddch(LED,'?');
+#endif
      break;
    }
   }
  }
 
- wattron(LED,COLOR_PAIR(2));
  for(i=0;i<4;i++){
   for(j=0;j<4;j++){
    if(thisData->data->block_y+i<0||
@@ -392,15 +344,10 @@ void draw(TetrisWorld *thisData){
     continue;
    }
    if(thisData->data->using_block[i][j]){
-    mvwaddch(LED,
-             thisData->data->block_y+i,
-             thisData->data->block_x+j,
-             'X');
+    my_led_plot(LED_GREEN,thisData->data->block_y+i,thisData->data->block_x+j);
    }
   }
  }
- wattroff(LED,COLOR_PAIR(2));
- wrefresh(LED);
 }
 
 void drawNextBlock(TetrisWorld *thisData){
@@ -408,18 +355,17 @@ void drawNextBlock(TetrisWorld *thisData){
  int i,j;
 
  set_block(thisData->data->next_block_no,dummy);
- wattron(thisData->display->LED,COLOR_PAIR(1));
  for(i=0;i<4;i++){
   for(j=0;j<4;j++){
    if(dummy[i][j]){
-    mvwaddch(thisData->display->LED,1+i,11+j,'X');
+    my_led_plot(LED_RED,1+i,11+j);
    }else{
-    mvwaddch(thisData->display->LED,1+i,11+j,' ');
+    my_led_plot(LED_NONE,1+i,11+j);
    }
   }
  }
- wattroff(thisData->display->LED,COLOR_PAIR(1));
 }
+
 
 void deleteLine(TetrisWorld *thisData){
 #define MAP_Y thisData->tetris->map_y
@@ -427,7 +373,8 @@ void deleteLine(TetrisWorld *thisData){
 #define MAP thisData->data->map
  int i,j,k;
  int flag;
- //int dLine;
+ int dLine=0;
+ char wData[21];
 
  for(i=0;i<(int)MAP_Y;i++){
   flag=MAP[MAP_Y-1-i][0];
@@ -435,6 +382,7 @@ void deleteLine(TetrisWorld *thisData){
    flag&=MAP[MAP_Y-1-i][j];
   }
   if(flag){
+   dLine++;
    for(k=i;k<(int)MAP_Y-1;k++){
     for(j=0;j<(int)MAP_X;j++){
      MAP[MAP_Y-1-k][j]=MAP[MAP_Y-1-k-1][j];
@@ -446,6 +394,23 @@ void deleteLine(TetrisWorld *thisData){
    i--;
   }
  }
+ switch (dLine) {
+  case 1:
+   thisData->data->score+=100;
+   break;
+  case 2:
+   thisData->data->score+=250;
+   break;
+  case 3:
+   thisData->data->score+=500;
+  case 4:
+   thisData->data->score+=1000;
+  default:
+   break;
+ }
+ snprintf(wData,17,"SCORE:%10d",thisData->data->score);
+ fprintf(stderr,"wData:%s\n",wData);
+ my_lcd_write(1,wData);
 #undef MAP_Y
 #undef MAP_X
 #undef MAP
@@ -493,6 +458,99 @@ void set_map_block(TetrisWorld *thisData){
 }
 
 int gameover(TetrisWorld *thisData){
- endwin();
- exit(EXIT_FAILURE);
+ int flag=0;
+ flag=flag;
+#if defined ENABLE_AVR
+ switch_state tetris_switch={0};
+
+ switch_state_clear(&tetris_switch);
+
+ lcd_put_data(1,"PRESS ANY BUTTON    ");
+ //スコア表示
+ while(flag){
+  switch_get(SWITCH_CONT_P1,&tetris_switch);
+  if(tetris_switch.switch_a){
+   flag=1;
+  }
+ }
+ lcd_put_data(0,"A:GO BACK MENU  ");
+ lcd_put_data(1,"B:RESTART TETRIS");
+ while(!flag){
+  switch_get(SWITCH_CONT_P1,&tetris_switch);
+  if(tetris_switch.switch_a||tetris_switch.switch_b){
+   flag=0;
+  }
+ }
+ if(tetris_switch.switch_a){
+  free_this(thisData);
+  thisData->data->endFlag=1;
+ }else if(tetris_switch.switch_b){
+  initialize(thisData);
+ }
+#endif
+ thisData->data->endFlag=1;
+ return 0;
+}
+
+void my_led_plot(uint8_t color,uint8_t y,uint8_t x){
+#if defined(HAS_CURSES)
+ mvwaddch(LED,y,x,' '|COLOR_PAIR(color));
+#elif defined(ENABLE_AVR)
+ led_plot(color,y,x);
+#endif
+}
+void my_lcd_write(uint8_t row,const char* str){
+#if defined(HAS_CURSES)
+ int i;
+
+ for(i=0;*str!='\0'&&i<16;str++,i++){
+  fprintf(stderr,"i:%d,str:%c\n",i,*str);
+  mvwaddch(realLCD,row,i,*str|COLOR_PAIR(0));
+ }
+#elif defined(ENABLE_AVR)
+ lcd_put_data(row,str);
+#endif
+}
+
+void getTetrisInput(TetrisInput *thisInput){
+#if defined(HAS_CURSES)
+ int ch;
+ ch=wgetch(LED);
+ switch(ch){
+  case KEY_LEFT:
+  case 'h':
+   thisInput->x=-1;
+   break;
+  case KEY_RIGHT:
+  case 'l':
+   thisInput->x=1;
+   break;
+  case KEY_DOWN:
+  case 'j':
+   thisInput->down=1;
+   break;
+  case KEY_UP:
+  case 'k':
+  case ' ':
+   thisInput->rotate=1;
+  default:
+   break;
+ }
+#elif defined(ENABLE_AVR)
+ switch_state tetris_switch={0};
+ switch_state_clear(&tetris_switch);
+ switch_get(SWITCH_CONT_P1,&tetris_switch);
+ if(tetris_switch.switch_l){
+  thisInput->x=-1;
+ }
+ if(tetris_switch.switch_r){
+  thisInput->x=1;
+ }
+ if(tetris_switch.switch_d){
+  thisInput->down=1;
+ }
+ if(tetris_switch.switch_a||tetris_switch.switch_b){
+  thisInput->rotate=1;
+ }
+#endif
 }
