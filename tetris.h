@@ -95,3 +95,5 @@ typedef struct{
  Tetris_Data *data;
  switch_state sw;
 }TetrisWorld;
+
+int call_tetris(void);
