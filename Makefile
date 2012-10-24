@@ -11,8 +11,8 @@ LDFLAGS=-L$(LETRO_PATH)/src
 
 all:tetris
 
-tetris:main.o
-	$(CC) -o tetris main.o -W -Wall -lncurses -g
+tetris:tetris.o
+	$(CC) -o tetris tetris.o -W -Wall -lncurses -g
 
 clean:
 	rm tetris
