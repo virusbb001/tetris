@@ -4,9 +4,9 @@
 WINDOW *LCD;
 WINDOW *realLCD;
 WINDOW *LED;
+WINDOW *fakeLED;
 #endif
 
-int call_tetris(void);
 
 //初期化系
 static void initialize(TetrisWorld *thisData);
@@ -132,12 +132,18 @@ void setNcurses(TetrisWorld *thisData){
  init_pair(2,-1,COLOR_RED);
  init_pair(3,-1,COLOR_YELLOW);
 
- LED=newwin(thisData->hard->LED_height,thisData->hard->LED_width,5,2);
+ fakeLED=newwin(thisData->hard->LED_height+2,thisData->hard->LED_width+2,5,2);
+ LED=subwin(fakeLED,thisData->hard->LED_height,thisData->hard->LED_width,6,3);
  LCD=newwin(thisData->hard->LCD_height+2,thisData->hard->LCD_width+2,0,0);
  realLCD=subwin(LCD,thisData->hard->LCD_height,thisData->hard->LCD_width,1,1);
- if(LED==NULL||LCD==NULL||realLCD==NULL){
+ if(LED==NULL||LCD==NULL||realLCD==NULL||fakeLED==NULL){
   endwin();
-  fprintf(stderr,"LCD IS NULL\n");
+  if(LED==NULL){
+   fprintf(stderr,"LED IS NULL\n");
+  }
+  if(fakeLED==NULL){
+   fprintf(stderr,"fakeLED IS NULL\n");
+  }
   exit(EXIT_FAILURE);
  }
 
@@ -146,7 +152,9 @@ void setNcurses(TetrisWorld *thisData){
  nodelay(LED,TRUE);
 
  box(LCD,'|','-');
+ box(fakeLED,'|','-');
  wrefresh(LCD);
+ wrefresh(fakeLED);
 
 }
 #endif
@@ -473,6 +481,7 @@ void set_map_block(TetrisWorld *thisData){
 int gameover(TetrisWorld *thisData){
  int flag=0;
 
+ draw(thisData);
  switch_state *sw=&(thisData->sw);
  flag=flag;
  my_lcd_write(1,"PRESS ANY BUTTON    ");
