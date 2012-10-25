@@ -70,7 +70,7 @@ int call_tetris(void){
   wrefresh(realLCD);
   usleep((1000/60)*1000);
 #elif defined(ENABLE_AVR)
-  _delay_ms(1000/60);
+  _delay_us((1000/60)*1000);
 #endif
  }
 #if defined(HAS_CURSES)
@@ -98,7 +98,9 @@ void initialize(TetrisWorld *thisData){
  for(i=0;i<(int)thisData->hard->LED_height;i++){
   my_led_plot(LED_YELLOW,i,10);
  }
+ //LCD初期化
  my_lcd_write(0,"                    ");
+ my_lcd_write(1,"                    ");
  deleteLine(thisData);
 }
 
@@ -241,9 +243,10 @@ void move_block(TetrisWorld *thisData){
  switch_state *sw=&(thisData->sw);
 
  my_set_switch(sw);
- if(sw->switch_a){
+ //連打補正
+ if(sw->switch_a&&(!sw->switch_prev_a)){
   rotate=1;
- }else if(sw->switch_b){
+ }else if(sw->switch_b&&(!sw->switch_prev_b)){
   rotate=-1;
  }
  if(sw->switch_l){
@@ -415,6 +418,7 @@ void deleteLine(TetrisWorld *thisData){
    i--;
   }
  }
+ thisData->data->deletedLine+=dLine;
  switch (dLine) {
   case 1:
    thisData->data->score+=100;
@@ -429,8 +433,9 @@ void deleteLine(TetrisWorld *thisData){
   default:
    break;
  }
+ snprintf(wData,17,"DELETEDLINE:%4d",thisData->data->deletedLine);
+ my_lcd_write(0,wData);
  snprintf(wData,17,"SCORE:%10d",thisData->data->score);
- //fprintf(stderr,"wData:%s\n",wData);
  my_lcd_write(1,wData);
 #undef MAP_Y
 #undef MAP_X
@@ -484,7 +489,8 @@ int gameover(TetrisWorld *thisData){
  draw(thisData);
  switch_state *sw=&(thisData->sw);
  flag=flag;
- my_lcd_write(1,"PRESS ANY BUTTON    ");
+ my_lcd_write(0,"GAME OVER           ");
+ my_lcd_write(1,"PRESS A BUTTON      ");
  //スコア表示
  while(!flag){
   my_set_switch(sw);
@@ -566,10 +572,10 @@ static void my_set_switch(switch_state *target){
   case ' ':
    target->switch_u=1;
    break;
-  case 'z':
+  case 'x':
    target->switch_a=1;
    break;
-  case 'x':
+  case 'z':
    target->switch_b=1;
    break;
   default:
