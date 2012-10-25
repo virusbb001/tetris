@@ -7,7 +7,7 @@
 #endif
 
 #include <stdlib.h>
-#include <unistd.h>
+#include <stdio.h>
 
 //AVR
 #if defined ENABLE_AVR
@@ -37,11 +37,11 @@
 #define LED_YELLOW			3
 
 
-#include <stdio.h>
 #include <signal.h>
 #include <ncurses.h>
 #include <time.h>
 #include <stdint.h>
+#include <unistd.h>
 
 typedef struct 
 {

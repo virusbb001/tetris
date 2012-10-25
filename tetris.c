@@ -43,8 +43,7 @@ static void my_set_switch(switch_state *target);
 
 #if defined(HAS_CURSES)
 int main(void){
- call_tetris();
- return 0;
+ return call_tetris();
 }
 #endif
 
@@ -73,9 +72,11 @@ int call_tetris(void){
   _delay_us((1000/60)*1000);
 #endif
  }
-#if defined(HAS_CURSES)
  free_this(this);
+#if defined(HAS_CURSES)
  endwin();
+#elif defined(ENABLE_AVR)
+
 #endif
 
  return 0;
@@ -497,7 +498,11 @@ int gameover(TetrisWorld *thisData){
   if(sw->switch_a){
    flag=1;
   }
+#if defined(HAS_CURSES)
   usleep((1000/60)*1000);
+#elif defined(ENABLE_AVR)
+  _delay_us((1000/60)*1000);
+#endif
  }
  my_lcd_write(0,"A:GO BACK MENU  ");
  my_lcd_write(1,"B:RESTART TETRIS");
@@ -506,7 +511,11 @@ int gameover(TetrisWorld *thisData){
   if(sw->switch_a||sw->switch_b){
    flag=0;
   }
+#if defined(HAS_CURSES)
   usleep((1000/60)*1000);
+#elif defined(ENABLE_AVR)
+  _delay_us((1000/60)*1000);
+#endif
  }
  if(sw->switch_a){
   thisData->data->endFlag=1;
@@ -520,7 +529,8 @@ void my_led_plot(uint8_t color,uint8_t y,uint8_t x){
 #if defined(HAS_CURSES)
  mvwaddch(LED,y,x,' '|COLOR_PAIR(color));
 #elif defined(ENABLE_AVR)
- led_plot(color,y,x);
+ led_plot(LED_NONE,x,y);
+ led_plot(color,x,y);
 #endif
 }
 void my_lcd_write(uint8_t row,const char* str){
@@ -583,6 +593,6 @@ static void my_set_switch(switch_state *target){
  }
 
 #elif defined(ENABLE_AVR)
- switch_state_clear(SWITCH_CONT_P1,target);
+ switch_get(SWITCH_CONT_P0,target);
 #endif
 }
