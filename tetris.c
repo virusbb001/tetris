@@ -508,7 +508,7 @@ int gameover(TetrisWorld *thisData){
  my_lcd_write(1,"B:RESTART TETRIS");
  while(flag){
   my_set_switch(sw);
-  if(sw->switch_a||sw->switch_b){
+  if((sw->switch_a&&(!(sw->switch_prev_a)))||((sw->switch_b)&&(!(sw->switch_prev_b)))){
    flag=0;
   }
 #if defined(HAS_CURSES)
@@ -519,6 +519,12 @@ int gameover(TetrisWorld *thisData){
  }
  if(sw->switch_a){
   thisData->data->endFlag=1;
+  my_lcd_write(0,"THX 4 PLAYING   ");
+#if defined(HAS_CURSES)
+  usleep(999999);
+#elif defined(ENABLE_AVR)
+  _delay_us(999999);
+#endif
  }else if(sw->switch_b){
   initialize(thisData);
  }
