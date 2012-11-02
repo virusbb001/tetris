@@ -1,3 +1,7 @@
+
+#if !defined(INCLUDED_TETRIS)
+#define INCLUDED_TETRIS
+
 #if !defined(HAS_CURSES)
 # define ENABLE_AVR
 #endif
@@ -69,7 +73,7 @@ typedef struct{
 }Tetris_Hard_Info;
 
 typedef struct{
- unsigned int block_down_time;
+ int block_down_time;
  unsigned int map_x;
  unsigned int map_y;
 }Tetris_Data_List;
@@ -85,7 +89,8 @@ typedef struct{
 
  int generateFlag;
  int endFlag;
- int flame;
+ int block_flame;
+ int key_flame;
  int map[16][10];
 }Tetris_Data;
 
@@ -97,3 +102,4 @@ typedef struct{
 }TetrisWorld;
 
 int call_tetris(void);
+#endif

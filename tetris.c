@@ -1,5 +1,12 @@
 #include "tetris.h"
 
+#undef FLAME_WAIT
+#if defined(HAS_CURSES)
+#define FLAME_WAIT ((1000/60)*1000)
+#elif defined(ENABLE_AVR)
+#define FLAME_WAIT ((1000/100)*1000)
+#endif
+
 #if defined(HAS_CURSES)
 WINDOW *LCD;
 WINDOW *realLCD;
@@ -62,14 +69,15 @@ int call_tetris(void){
  this->data=(Tetris_Data *)malloc(sizeof(Tetris_Data));
  initialize(this);
  while(!this->data->endFlag){
-  this->data->flame++;
+  this->data->block_flame++;
+  this->data->key_flame++;
   loop(this);
 #if defined(HAS_CURSES)
   wrefresh(LED);
   wrefresh(realLCD);
-  usleep((1000/60)*1000);
+  usleep(FLAME_WAIT);
 #elif defined(ENABLE_AVR)
-  _delay_us((1000/60)*1000);
+  _delay_us(FLAME_WAIT);
 #endif
  }
  free_this(this);
@@ -120,7 +128,6 @@ void initAVR(void){
 #if defined HAS_CURSES
 void setNcurses(TetrisWorld *thisData){
  if(signal(SIGINT,signalhandler)==SIG_ERR){
-  fprintf(stderr,"SIGNALHANDLER ERROR\n");
   exit(EXIT_FAILURE);
  }
 
@@ -163,7 +170,6 @@ void setNcurses(TetrisWorld *thisData){
 #endif
 
 void setTetrisData(TetrisWorld *thisData){
- thisData->tetris->block_down_time=60;
  thisData->tetris->map_y=16;
  thisData->tetris->map_x=10;
 }
@@ -171,9 +177,12 @@ void setTetrisData(TetrisWorld *thisData){
 void initData(TetrisWorld *thisData){
  int i,j;
  //thisData->data->next_block_no=rand()%7;
+ //スピード初期値
+ thisData->tetris->block_down_time=60;
  thisData->data->generateFlag=1;
  thisData->data->endFlag=0;
- thisData->data->flame=0;
+ thisData->data->block_flame=0;
+ thisData->data->key_flame=0;
 
  thisData->data->deletedLine=0;
  thisData->data->score=0;
@@ -181,6 +190,11 @@ void initData(TetrisWorld *thisData){
  for(i=0;i<16;i++){
   for(j=0;j<10;j++){
    thisData->data->map[i][j]=0;
+  }
+ }
+ for(i=0;i<4;i++){
+  for(j=0;j<4;j++){
+   thisData->data->using_block[i][j]=0;
   }
  }
 }
@@ -250,11 +264,19 @@ void move_block(TetrisWorld *thisData){
  }else if(sw->switch_b&&(!sw->switch_prev_b)){
   rotate=-1;
  }
- if(sw->switch_l){
+#define TMP 2
+ if(sw->switch_l&&(thisData->data->key_flame%TMP==0)){
   move_x=-1;
- }else if(sw->switch_r){
+  thisData->data->key_flame++;
+ }else if(sw->switch_r&&(thisData->data->key_flame%TMP==0)){
   move_x=1;
+  thisData->data->key_flame++;
  }
+ //key_flameリセット
+ if((!sw->switch_l)&&(!sw->switch_r)){
+  thisData->data->key_flame=0;
+ }
+#undef TMP
 
 
  if(rotate!=0){
@@ -265,9 +287,9 @@ void move_block(TetrisWorld *thisData){
   }
  }
 
- if(sw->switch_d||thisData->data->flame%thisData->tetris->block_down_time==0){
+ if(sw->switch_d||thisData->data->block_flame%thisData->tetris->block_down_time==0){
   move_y=1;
-  thisData->data->flame=0;
+  thisData->data->block_flame=0;
  }else{
   move_y=0;
  }
@@ -302,7 +324,7 @@ void signalhandler(int sig){
 #endif
 
 void generate_block(TetrisWorld *thisData){
- thisData->data->flame=0;
+ thisData->data->block_flame=0;
  thisData->data->generateFlag=0;
  thisData->data->block_x=3;
  thisData->data->block_y=0;
@@ -434,6 +456,12 @@ void deleteLine(TetrisWorld *thisData){
   default:
    break;
  }
+ if(dLine>0){
+  thisData->tetris->block_down_time=(60-((thisData->data->deletedLine*10)));
+  if(thisData->tetris->block_down_time<1){
+   thisData->tetris->block_down_time=1;
+  }
+ }
  snprintf(wData,17,"DELETEDLINE:%4d",thisData->data->deletedLine);
  my_lcd_write(0,wData);
  snprintf(wData,17,"SCORE:%10d",thisData->data->score);
@@ -486,22 +514,36 @@ void set_map_block(TetrisWorld *thisData){
 
 int gameover(TetrisWorld *thisData){
  int flag=0;
+ char wData[21];
 
  draw(thisData);
  switch_state *sw=&(thisData->sw);
  flag=flag;
  my_lcd_write(0,"GAME OVER           ");
  my_lcd_write(1,"PRESS A BUTTON      ");
- //スコア表示
  while(!flag){
   my_set_switch(sw);
-  if(sw->switch_a){
+  if(sw->switch_a&&(!(sw->switch_prev_a))){
    flag=1;
   }
 #if defined(HAS_CURSES)
-  usleep((1000/60)*1000);
+  usleep(FLAME_WAIT);
 #elif defined(ENABLE_AVR)
-  _delay_us((1000/60)*1000);
+  _delay_us(FLAME_WAIT);
+#endif
+ }
+ flag=0;
+ snprintf(wData,17,"SCORE:%10d",thisData->data->score);
+ my_lcd_write(0,wData);
+ while(!flag){
+  my_set_switch(sw);
+  if(sw->switch_a&&(!(sw->switch_prev_a))){
+   flag=1;
+  }
+#if defined(HAS_CURSES)
+  usleep(FLAME_WAIT);
+#elif defined(ENABLE_AVR)
+  _delay_us(FLAME_WAIT);
 #endif
  }
  my_lcd_write(0,"A:GO BACK MENU  ");
@@ -512,9 +554,9 @@ int gameover(TetrisWorld *thisData){
    flag=0;
   }
 #if defined(HAS_CURSES)
-  usleep((1000/60)*1000);
+  usleep(FLAME_WAIT);
 #elif defined(ENABLE_AVR)
-  _delay_us((1000/60)*1000);
+  _delay_us(FLAME_WAIT);
 #endif
  }
  if(sw->switch_a){
@@ -602,3 +644,5 @@ static void my_set_switch(switch_state *target){
  switch_get(SWITCH_CONT_P0,target);
 #endif
 }
+
+#undef FLAME_WAIT

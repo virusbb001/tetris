@@ -18,3 +18,9 @@ clean:
 	rm tetris
 	rm *.o 
 
+remake:
+	make clean
+	make all
+
+tetris.c:tetris.h
+tetris.o:tetris.c
