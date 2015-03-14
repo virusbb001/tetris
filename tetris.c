@@ -2,7 +2,7 @@
 
 #undef FLAME_WAIT
 #if defined(HAS_CURSES)
-#define FLAME_WAIT ((1000/60)*1000)
+#define FLAME_WAIT ((1000/100)*1000)
 #elif defined(ENABLE_AVR)
 #define FLAME_WAIT ((1000/100)*1000)
 #endif
@@ -176,7 +176,11 @@ void setTetrisData(TetrisWorld *thisData){
 
 void initData(TetrisWorld *thisData){
  int i,j;
- //thisData->data->next_block_no=rand()%7;
+ //SET NEXT BLOCK
+ thisData->data->next_block_no=rand()%7;
+#if defined BLOCK_ALL_BLOCK
+ thisData->data->next_block_no=0;
+#endif
  //スピード初期値
  thisData->tetris->block_down_time=60;
  thisData->data->generateFlag=1;
@@ -264,7 +268,13 @@ void move_block(TetrisWorld *thisData){
  }else if(sw->switch_b&&(!sw->switch_prev_b)){
   rotate=-1;
  }
+
+ //TODO:CHANGE IT
+#if defined(HAS_CURSES)
+#define TMP 1
+#elif defined (ENABLE_AVR)
 #define TMP 2
+#endif
  if(sw->switch_l&&(thisData->data->key_flame%TMP==0)){
   move_x=-1;
   thisData->data->key_flame++;
@@ -318,7 +328,6 @@ void move_block(TetrisWorld *thisData){
 void signalhandler(int sig){
  endwin();
  fprintf(stderr,"SIG:%d\n",sig);
- sig=sig;
  exit(EXIT_FAILURE);
 }
 #endif
@@ -330,7 +339,11 @@ void generate_block(TetrisWorld *thisData){
  thisData->data->block_y=0;
  set_block(thisData->data->next_block_no,thisData->data->using_block);
 
+ //SET NEXT BLOCK
  thisData->data->next_block_no=rand()%7;
+#if defined BLOCK_ALL_BLOCK
+ thisData->data->next_block_no=0;
+#endif
  drawNextBlock(thisData);
 
  if(conflict(thisData)){
@@ -457,7 +470,8 @@ void deleteLine(TetrisWorld *thisData){
    break;
  }
  if(dLine>0){
-  thisData->tetris->block_down_time=(60-((thisData->data->deletedLine*10)));
+  //TODO:CHANGE IT
+  thisData->tetris->block_down_time=(60-((thisData->data->deletedLine)));
   if(thisData->tetris->block_down_time<1){
    thisData->tetris->block_down_time=1;
   }
@@ -562,6 +576,7 @@ int gameover(TetrisWorld *thisData){
  if(sw->switch_a){
   thisData->data->endFlag=1;
   my_lcd_write(0,"THX 4 PLAYING   ");
+  my_lcd_write(1,"                ");
 #if defined(HAS_CURSES)
   usleep(999999);
 #elif defined(ENABLE_AVR)

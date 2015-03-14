@@ -1,9 +1,9 @@
-CC = gcc-4.7
+CC = gcc
 #CC=avr-gcc
 
 
 LETRO_PATH = ./Letro_main
-CFLAGS=-I$(LETRO_PATH)/src -W -Wall -O0 -DHAS_CURSES -g
+CFLAGS=-I$(LETRO_PATH)/src -W -Wall -O0 -DHAS_CURSES -g 
 LDFLAGS=-L$(LETRO_PATH)/src
 
 .c.o:
